@@ -3,94 +3,38 @@ This repository contains inference code for [SceneScript](https://www.projectari
 
 <p align="center"><img src="imgs/scenescript_diagram.png"/></p>
 
-## Installation
+## Using SceneScript on Euler Cluster
 
-The code can be installed via `conda`. Please follow the instructions [here](https://docs.anaconda.com/anaconda/install/index.html) to install Anaconda for your machine.
+SceneScript is set up on the Euler Cluster, allowing you to run computations seamlessly. Since it operates within a shared cluster space, any changes you make will impact all users. To preserve version history and track important results or modifications, consider pushing them to the designated Git repository.
 
-We list our dependencies in `environment.yaml` file. To install the dependencies and create the env, run:
+1. Open Jupyter Notebook on Euler Cluster: [https://jupyter.euler.hpc.ethz.ch/hub/spawn](https://jupyter.euler.hpc.ethz.ch/hub/spawn)
+2. Navigate to the following directory in the GUI: `/cluster/project/dewolf/pemmenegger/scenescript`
+3. Open a terminal in this directory.
+4. Load the required Python modules by running: `module load stack/2024-06 python_cuda/3.11.6`
+5. Activate the Python virtual environment by running: `source venv/bin/activate`
 
-```
-conda env create --file=environment.yaml
+No you are ready to do computations. Make sure that you always stay at `/cluster/project/dewolf/pemmenegger/scenescript` in your terminal while running jobs.
 
-conda activate scenescript
-```
+### Running Jobs on Euler
 
-Notes:
-* This can take quite a while, up to 30 minutes due to compiling the [torchsparse library](https://github.com/mit-han-lab/torchsparse).
-* Due to relying on [torchsparse v2.1](https://github.com/mit-han-lab/torchsparse/tree/v2.1.0), this codebase requires CUDA to be available on the machine. See this [Github issue](https://github.com/mit-han-lab/torchsparse/issues/280) for more info.
-* This codebase has been tested with _linux only_.
+Do not run .ipynb files via the GUI. Instead, submit jobs via sbatch.
+- .ipynb files should be used for debugging and testing.
+- Using the `--inplace` flag, the results are written back to the .ipynb file upon success. If an error occurs, the .ipynb file remains unmodified.
 
-## Models
-We provide two trained models that operate on semi-dense point clouds obtained via [Project Aria Machine Perception Services](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud):
+Hence, to execute inference.ipynb, use the following command: `sbatch --gpus=1 --mem-per-cpu=8g --wrap="jupyter nbconvert --to notebook --execute inference.ipynb --inplace"`
 
-* The first one is trained on [Aria Synthetic Environments](https://www.projectaria.com/datasets/ase/) (ASE). This model predicts layout (wall/door/window) and gravity-aligned 3D bounding boxes with class labels. Note that as of 9/17/2024, ASE has not been publicly released with bounding box annotations.
-* The second model is trained on a proprietary dataset that is quite similar to ASE. Similar to the first model, it predicts both layout (wall/door/window) and gravity-aligned 3D bounding boxes. However, because this dataset is proprietary, we do not release the bounding box class taxonomy, and this model does not predict classes for the bounding boxes. This proprietary dataset contains non-Manhattan layout configurations and thus generalises better to real-world scenes, and was used in the demo videos as seen on the [SceneScript website](https://www.projectaria.com/scenescript/).
+To execute run_grid_search.py, use: `sbatch --gpus=1 --gres=gpumem:40g --mem-per-cpu=32g --wrap="python run_grid_search.py"`
 
-| Training Dataset | Download link |
-| -------- | -------- |
-| Aria Synthetic Environments | [scenescript_website](https://www.projectaria.com/scenescript/) |
-| Internal Proprietary Dataset | [scenescript_website](https://www.projectaria.com/scenescript/) |
+`--gres=gpumem:40g` refers to the amount of GPU memory you want to use and `--mem-per-cpu=32g`to the amount of CPU memory. You can modify those values as needed.
 
-## Example Data
+### Monitoring Jobs
 
-The provided SceneScript models operate on semi-dense point clouds obtained via [Project Aria Machine Perception Services](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud). To obtain a few examples from [ASE](https://www.projectaria.com/datasets/ase/) (synthetic) and [Aria Everyday Activities](https://www.projectaria.com/datasets/aea/) (real-world), run the following commands:
+After submitting a job, you can check its status using: `myjobs -j <JOB_ID>`. Job logs will be saved in a Slurm file generated upon submission.
 
-```
-export SEMIDENSE_SAMPLE_PATH=/tmp/semidense_samples
-mkdir -p $SEMIDENSE_SAMPLE_PATH/ase
-mkdir -p $SEMIDENSE_SAMPLE_PATH/aea
+### Closing Jupyter Notebook Session
 
-export ASE_BASE_URL="https://www.projectaria.com/async/sample/download/?bucket=ase&filename="
-export AEA_BASE_URL="https://www.projectaria.com/async/sample/download/?bucket=aea&filename="
-export OPTIONS="-C - -O -L"
+Once you’re done, properly close your Jupyter Notebook session:
 
-# ASE (Synthetic)
-curl -o $SEMIDENSE_SAMPLE_PATH/ase/ase_examples.zip $OPTIONS "${ASE_BASE_URL}ase_examples.zip"
-
-# AEA (Real-world)
-curl -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script1_seq1_rec1.zip $OPTIONS "${AEA_BASE_URL}loc1_script1_seq1_rec1.zip"
-curl -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec1_10s_sample.zip $OPTIONS "${AEA_BASE_URL}loc1_script2_seq1_rec1_10s_sample.zip"
-curl -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec2_10s_sample.zip $OPTIONS "${AEA_BASE_URL}loc1_script2_seq1_rec2_10s_sample.zip"
-
-# Unzip everything
-unzip -o $SEMIDENSE_SAMPLE_PATH/ase/ase_examples.zip -d $SEMIDENSE_SAMPLE_PATH/ase/ase_examples
-unzip -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script1_seq1_rec1.zip -d $SEMIDENSE_SAMPLE_PATH/aea/loc1_script1_seq1_rec1
-unzip -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec1_10s_sample.zip -d $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec1_10s_sample
-unzip -o $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec2_10s_sample.zip -d $SEMIDENSE_SAMPLE_PATH/aea/loc1_script2_seq1_rec2_10s_sample
-```
-
-In the unzipped directories, the semi-dense point cloud files are labelled as `semidense_points.csv.gz`.
-
-## Jupyter Notebook
-
-See the [inference Jupyter Notebook](inference.ipynb) for an example of how to run the network. In order to run this, Jupyter must be installed (this is included in `environment.yaml`). If you haven't used Jupyter Notebooks before, [here](https://www.dataquest.io/blog/jupyter-notebook-tutorial/) is a tutorial to get you up to speed.
-
-Notes:
-
-* Make sure to activate the conda environment before running jupyter. This can be done with ```conda activate scenescript; jupyter notebook```
-* Make sure to update the filepaths to point to the downloaded files.
-
-The result should look like the following:
-
-<p align="center"><img src="imgs/jupyter_notebook_result.png"/></p>
-
-## License
-
-The models/code are licensed under the [CC BY-NC license](LICENSE).
-
-## Contributing
-
-See [contributing](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
-
-## Citing SceneScript
-
-If you use SceneScript in your research, please use the following BibTeX entry.
-
-```
-@inproceedings{avetisyan2024scenescript,
-    title       = {SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model},
-    author      = {Avetisyan, Armen and Xie, Christopher and Howard-Jenkins, Henry and Yang, Tsun-Yi and Aroudj, Samir and Patra, Suvam and Zhang, Fuyang and Frost, Duncan and Holland, Luke and Orme, Campbell and Engel, Jakob and Miller, Edward and Newcombe, Richard and Balntas, Vasileios},
-    booktitle   = {European Conference on Computer Vision (ECCV)},
-    year        = {2024},
-}
-```
+1.	Go to File > Hub Control Panel.
+2.	Click Stop Server.
+3.	Close the browser window.

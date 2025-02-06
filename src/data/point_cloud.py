@@ -36,6 +36,10 @@ class PointCloud:
             import projectaria_tools.core.mps as mps
             from projectaria_tools.core.mps.utils import filter_points_from_confidence
 
+            if "_ios.csv.gz" in point_cloud_filename:
+                print("ios point cloud detected!")
+                raise ImportError
+
             all_points = mps.read_global_point_cloud(point_cloud_filename)
 
             # filter the point cloud using thresholds on the inverse depth and distance standard deviation

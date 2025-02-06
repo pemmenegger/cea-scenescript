@@ -1,0 +1,4 @@
+venv/
+weights/
+.ipynb_checkpoints/
+__pycache__/
